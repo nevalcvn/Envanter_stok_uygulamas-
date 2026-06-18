@@ -1,0 +1,28 @@
+# Python Derleme ve Önbellek Dosyaları
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Sanal Ortamlar (Virtual Environments)
+venv/
+env/
+.venv/
+Scripts/
+
+# Veritabanı Dosyaları
+*.db
+*.sqlite
+*.sqlite3
+
+# Otomat Sisteminin Ürettiği Geçici Fişler
+Toptanci_Siparis_Fisi_*.txt
+
+# IDE ve Editör Ayarları 
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# İşletim Sistemi Kalıntıları
+.DS_Store
+Thumbs.db
