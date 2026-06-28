@@ -1,11 +1,13 @@
 import sys
 import sqlite3
 import os
+from datetime import datetime, date
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QLabel, QTableWidget, 
                              QHeaderView, QDialog, QFormLayout, QComboBox, 
                              QDateEdit, QMessageBox, QTableWidgetItem)
 from PyQt5.QtCore import QDate
+from PyQt5.QtGui import QColor # Hücreleri boyamak için gerekli kütüphane
 
 # ---------------------------------------------------------
 # 1. YENİ KAYIT PENCERESİ (DIALOG) SINIFI
@@ -92,7 +94,6 @@ class EnvanterTakipUygulamasi(QMainWindow):
 
     def db_baglan(self):
         try:
-            # Dinamik dosya yolu: Kod neredeyse, veritabanını da o klasörde arar
             mevcut_klasor = os.path.dirname(os.path.abspath(__file__))
             veritabani_yolu = os.path.join(mevcut_klasor, "Envanter_Problemi.db") 
             
@@ -104,6 +105,24 @@ class EnvanterTakipUygulamasi(QMainWindow):
 
     def arayuz_olustur(self):
         self.sol_menu_layout = QVBoxLayout()
+        
+        # Tümünü Göster Butonu
+        self.btn_tumunu_goster = QPushButton("TÜMÜNÜ GÖSTER")
+        self.btn_tumunu_goster.setStyleSheet("""
+            QPushButton {
+                background-color: #757575; 
+                color: white; 
+                font-weight: bold; 
+                padding: 12px;
+                border-radius: 5px;
+                margin-bottom: 10px;
+            }
+            QPushButton:hover { background-color: #616161; }
+        """)
+        self.btn_tumunu_goster.clicked.connect(lambda: self.tabloyu_guncelle(kategori=None))
+        self.sol_menu_layout.addWidget(self.btn_tumunu_goster)
+        
+        # Dinamik Kategori Butonları
         self.kategori_butonlari_olustur()
         self.sol_menu_layout.addStretch() 
         
@@ -117,9 +136,7 @@ class EnvanterTakipUygulamasi(QMainWindow):
                 border-radius: 5px;
                 margin-top: 10px;
             }
-            QPushButton:hover {
-                background-color: #1976D2;
-            }
+            QPushButton:hover { background-color: #1976D2; }
         """)
         self.btn_yeni_kayit.clicked.connect(self.yeni_kayit_penceresi_ac)
         self.sol_menu_layout.addWidget(self.btn_yeni_kayit)
@@ -138,31 +155,47 @@ class EnvanterTakipUygulamasi(QMainWindow):
         self.ana_layout.addLayout(self.sol_menu_layout, 1) 
         self.ana_layout.addLayout(self.sag_panel_layout, 4) 
         
-        self.tabloyu_guncelle()
+        self.tabloyu_guncelle(kategori=None)
 
     def kategori_butonlari_olustur(self):
         try:
             self.cursor.execute("SELECT Kategori_Adi FROM Categories")
             kategoriler = self.cursor.fetchall()
             
-            buton_stili = """
-                QPushButton {
-                    background-color: #E0E0E0; 
-                    color: #333333; 
-                    font-weight: bold; 
-                    padding: 12px;
-                    border-radius: 5px;
-                    margin-bottom: 5px;
-                }
-                QPushButton:hover {
-                    background-color: #D0D0D0;
-                }
-            """
-
             for kat in kategoriler:
                 kategori_adi = kat[0]
+                
+                arkaplan_rengi = "#E0E0E0" 
+                metin_rengi = "#333333"
+                
+                if "matcha" in kategori_adi.lower():
+                    arkaplan_rengi = "#93C572" 
+                    metin_rengi = "black"
+                elif "kahve" in kategori_adi.lower():
+                    arkaplan_rengi = "#D2B48C" 
+                    metin_rengi = "black"
+                elif "çay" in kategori_adi.lower() or "tea" in kategori_adi.lower():
+                    arkaplan_rengi = "#FFB347" 
+                    metin_rengi = "black"
+
+                buton_stili = f"""
+                    QPushButton {{
+                        background-color: {arkaplan_rengi}; 
+                        color: {metin_rengi}; 
+                        font-weight: bold; 
+                        padding: 12px;
+                        border-radius: 5px;
+                        margin-bottom: 5px;
+                    }}
+                    QPushButton:hover {{
+                        opacity: 0.8;
+                    }}
+                """
+                
                 btn = QPushButton(kategori_adi)
                 btn.setStyleSheet(buton_stili)
+                
+                btn.clicked.connect(lambda checked, k=kategori_adi: self.tabloyu_guncelle(kategori=k))
                 self.sol_menu_layout.addWidget(btn)
                 
         except Exception as e:
@@ -171,25 +204,64 @@ class EnvanterTakipUygulamasi(QMainWindow):
     def yeni_kayit_penceresi_ac(self):
         dialog = UrunAcilisDialog(self.cursor, self.conn)
         if dialog.exec_():
-            self.tabloyu_guncelle()
+            self.tabloyu_guncelle(kategori=None)
 
-    def tabloyu_guncelle(self):
+    def tabloyu_guncelle(self, kategori=None):
         self.tablo.setRowCount(0)
+        bugun = date.today() # Tarih kıyaslaması için bugünün tarihi
         
         try:
-            sorgu = """
-                SELECT i.Malzeme_Adi, a.Acilis_tarihi, a.Son_kullanma_tarihi, a.Durum 
-                FROM Active_Products a
-                JOIN Ingredients i ON a.Malzeme_ID = i.ID
-                WHERE a.Durum = 'Açık'
-            """
-            self.cursor.execute(sorgu)
+            if kategori is None:
+                sorgu = """
+                    SELECT i.Malzeme_Adi, a.Acilis_tarihi, a.Son_kullanma_tarihi, a.Durum 
+                    FROM Active_Products a
+                    JOIN Ingredients i ON a.Malzeme_ID = i.ID
+                    WHERE a.Durum = 'Açık'
+                """
+                self.cursor.execute(sorgu)
+            else:
+                sorgu = """
+                    SELECT i.Malzeme_Adi, a.Acilis_tarihi, a.Son_kullanma_tarihi, a.Durum 
+                    FROM Active_Products a
+                    JOIN Ingredients i ON a.Malzeme_ID = i.ID
+                    JOIN Categories c ON i.Kategori_ID = c.ID
+                    WHERE a.Durum = 'Açık' AND c.Kategori_Adi = ?
+                """
+                self.cursor.execute(sorgu, (kategori,))
+                self.baslik.setText(f"Aktif Ürünler: {kategori}")
+
+            if kategori is None:
+                self.baslik.setText("Tüm Aktif Ürünler ve Tazelik Durumu")
+
             kayitlar = self.cursor.fetchall()
             
             for satir_indeksi, satir_verisi in enumerate(kayitlar):
                 self.tablo.insertRow(satir_indeksi)
+                
+                # Son Kullanma Tarihi analiz kısmı (satir_verisi[2] -> Son_kullanma_tarihi sütunudur)
+                skt_str = satir_verisi[2]
+                kalan_gun = None
+                
+                try:
+                    # Metin olan tarihi Python tarih nesnesine dönüştür
+                    skt_tarihi = datetime.strptime(skt_str, "%Y-%m-%d").date()
+                    kalan_gun = (skt_tarihi - bugun).days
+                except Exception as e:
+                    print(f"Tarih ayrıştırma hatası: {e}")
+
                 for sutun_indeksi, veri in enumerate(satir_verisi):
-                    self.tablo.setItem(satir_indeksi, sutun_indeksi, QTableWidgetItem(str(veri)))
+                    item = QTableWidgetItem(str(veri))
+                    
+                    # AKILLI RENKLENDİRME MANTIĞI
+                    if kalan_gun is not None:
+                        if kalan_gun <= 0:
+                            # Tarihi geçmişse: Hafif Pastel Kırmızı
+                            item.setBackground(QColor("#FFCDD2"))
+                        elif kalan_gun <= 3:
+                            # 3 gün veya daha az kalmışsa: Hafif Pastel Turuncu/Sarı
+                            item.setBackground(QColor("#FFE082"))
+                            
+                    self.tablo.setItem(satir_indeksi, sutun_indeksi, item)
                     
         except Exception as e:
             print(f"Tablo güncellenirken hata oluştu: {e}")
